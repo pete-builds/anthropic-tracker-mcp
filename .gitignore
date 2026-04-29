@@ -9,3 +9,6 @@ venv/
 
 # Internal build/deploy notes — homelab-specific, not for public consumption
 SESSION-RESUME.md
+
+# Per-host compose override (homelab uses host networking; not for public repo)
+docker-compose.override.yml

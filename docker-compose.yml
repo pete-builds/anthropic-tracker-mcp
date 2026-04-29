@@ -1,10 +1,17 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   anthropic-tracker-mcp:
     build: .
-    image: anthropic-tracker-mcp:latest
+    image: anthropic-tracker-mcp:0.1.0
     container_name: anthropic-tracker-mcp
     restart: unless-stopped
-    network_mode: host
+    ports:
+      - "3713:3713"
     environment:
       - MCP_HOST=0.0.0.0
       - MCP_PORT=3713
@@ -13,8 +20,11 @@ services:
     volumes:
       # Read-only mount of the same named volume the tracker writes to.
       # The `:ro` flag is enforced by Docker. The SQLite driver also opens
-      # the DB with `mode=ro` for defense in depth (see clients/tracker.py).
+      # the DB with `mode=ro&immutable=1` for defense in depth.
       - anthropic-tracker-data:/data:ro
+    logging: *default-logging
+    # Note: if your Docker host's bridge IP pool is exhausted (rare, mostly
+    # a homelab issue), swap `ports:` for `network_mode: host` instead.
 
 volumes:
   anthropic-tracker-data:
