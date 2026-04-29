@@ -1,0 +1,21 @@
+services:
+  anthropic-tracker-mcp:
+    build: .
+    image: anthropic-tracker-mcp:latest
+    container_name: anthropic-tracker-mcp
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      - MCP_HOST=0.0.0.0
+      - MCP_PORT=3713
+      - TRACKER_DB_PATH=/data/tracker.db
+      - TZ=${TZ:-America/New_York}
+    volumes:
+      # Read-only mount of the same named volume the tracker writes to.
+      # The `:ro` flag is enforced by Docker. The SQLite driver also opens
+      # the DB with `mode=ro` for defense in depth (see clients/tracker.py).
+      - anthropic-tracker-data:/data:ro
+
+volumes:
+  anthropic-tracker-data:
+    external: true

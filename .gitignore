@@ -1,0 +1,11 @@
+.env
+__pycache__/
+*.pyc
+*.db
+.venv/
+venv/
+.pytest_cache/
+.DS_Store
+
+# Internal build/deploy notes — homelab-specific, not for public consumption
+SESSION-RESUME.md
