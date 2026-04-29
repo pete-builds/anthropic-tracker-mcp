@@ -5,8 +5,11 @@ WORKDIR /app
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Install from the hash-pinned lockfile. --require-hashes refuses any package
+# whose hash isn't in the file. Reproducible byte-for-byte.
+# Regenerate with: uv pip compile requirements.txt -o requirements.lock --generate-hashes
+COPY requirements.lock .
+RUN pip install --no-cache-dir --require-hashes -r requirements.lock
 
 COPY clients/ ./clients/
 COPY server.py .
