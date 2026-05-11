@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-05-11 — Security patch: fastmcp 3.2.4 (0.2.1)
+
+Bumped `fastmcp` 3.1.0 -> 3.2.4 to pick up upstream security fixes. No tool or transport changes; semver patch.
+
+- **CVE-2026-32871 (CRITICAL, SSRF in fastmcp):** unauthenticated server-side request forgery via the FastMCP HTTP transport in 3.1.x. Patched in 3.2.0.
+- **CVE-2026-27124 (HIGH, OAuthProxy):** OAuth proxy path could leak/forward credentials in 3.1.x. Patched in 3.2.x.
+- `requirements.txt` and `requirements.lock` regenerated with hash-pinned wheels for 3.2.4. Lockfile remains Python 3.13.
+- `docker-compose.yml`: image tag 0.2.0 -> 0.2.1. Port 3713, Streamable HTTP transport, `/data:ro` mount, hardening all unchanged.
+
+No client re-registration needed. Existing `claude mcp add anthropic-tracker -t http -s user http://<host>:3713/mcp` registrations keep working.
+
 ## 2026-05-11 — Streamable HTTP transport (0.2.0)
 
 Migrated from SSE to Streamable HTTP per the current MCP spec (pure SSE was superseded 2025-03-26). Same port 3713, same 10 tools, same return shapes — only the transport and endpoint path change.

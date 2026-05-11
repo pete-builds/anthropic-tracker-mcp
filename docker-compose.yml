@@ -7,7 +7,7 @@ x-logging: &default-logging
 services:
   anthropic-tracker-mcp:
     build: .
-    image: anthropic-tracker-mcp:0.2.0
+    image: anthropic-tracker-mcp:0.2.1
     container_name: anthropic-tracker-mcp
     restart: unless-stopped
     ports:
