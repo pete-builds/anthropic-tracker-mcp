@@ -26,7 +26,10 @@ jobs:
         run: ruff check .
 
       - name: Import smoke test
+        env:
+          TRACKER_DB_PATH: /tmp/tracker.db
         run: |
+          touch /tmp/tracker.db
           python -c "import server; import clients.tracker; import clients.greenhouse; import clients.parser"
 
   scan:
