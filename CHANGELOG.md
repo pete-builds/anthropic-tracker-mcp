@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-05-11 — Streamable HTTP transport (0.2.0)
+
+Migrated from SSE to Streamable HTTP per the current MCP spec (pure SSE was superseded 2025-03-26). Same port 3713, same 10 tools, same return shapes — only the transport and endpoint path change.
+
+- `server.py`: `mcp.run(transport="streamable-http", ...)` instead of `"sse"`. Env vars switched to `FASTMCP_HOST` / `FASTMCP_PORT` (legacy `MCP_HOST` / `MCP_PORT` still honored as fallback).
+- `healthcheck.py`: hits `/mcp` and treats HTTP 400/405/406 as healthy (Streamable HTTP rejects bare GETs — that response confirms FastMCP is listening and routing).
+- `docker-compose.yml`: image tag bumped to `0.2.0`, env vars updated to `FASTMCP_*`.
+- README: endpoint path documented as `/mcp`, registration command updated to `claude mcp add anthropic-tracker -t http -s user http://<host>:3713/mcp`.
+
+Breaking change for clients: SSE registrations against `:3713/sse` will fail. Re-register with the new command.
+
 ## 2026-04-29 — Live Greenhouse tools (3 added, 10 total)
 
 Added `live_jobs`, `live_job_detail`, `live_compensation` for queries that need data fresher than the daily cron's last snapshot.

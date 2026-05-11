@@ -7,14 +7,14 @@ x-logging: &default-logging
 services:
   anthropic-tracker-mcp:
     build: .
-    image: anthropic-tracker-mcp:0.1.0
+    image: anthropic-tracker-mcp:0.2.0
     container_name: anthropic-tracker-mcp
     restart: unless-stopped
     ports:
       - "3713:3713"
     environment:
-      - MCP_HOST=0.0.0.0
-      - MCP_PORT=3713
+      - FASTMCP_HOST=0.0.0.0
+      - FASTMCP_PORT=3713
       - TRACKER_DB_PATH=/data/tracker.db
       - TZ=${TZ:-America/New_York}
     volumes:

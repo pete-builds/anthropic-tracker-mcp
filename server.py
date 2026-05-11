@@ -356,9 +356,14 @@ async def live_compensation(job_id: int) -> str:
 # ============================================================
 
 if __name__ == "__main__":
-    host = os.getenv("MCP_HOST", "0.0.0.0")
-    port = int(os.getenv("MCP_PORT", "3713"))
-    print(f"Starting MCP Anthropic Tracker on {host}:{port} (SSE transport)")
+    # Honor both FASTMCP_* and legacy MCP_* env vars. FastMCP itself reads
+    # FASTMCP_HOST / FASTMCP_PORT from the environment when it sets up the
+    # streamable-http listener, so we mirror MCP_* into those names too.
+    host = os.getenv("FASTMCP_HOST", os.getenv("MCP_HOST", "0.0.0.0"))
+    port = int(os.getenv("FASTMCP_PORT", os.getenv("MCP_PORT", "3713")))
+    os.environ["FASTMCP_HOST"] = host
+    os.environ["FASTMCP_PORT"] = str(port)
+    print(f"Starting MCP Anthropic Tracker on {host}:{port} (Streamable HTTP transport)")
     print(f"DB (read-only): {DB_PATH}")
     print("Live source: https://boards-api.greenhouse.io/v1/boards/anthropic")
-    mcp.run(transport="sse", host=host, port=port)
+    mcp.run(transport="streamable-http", host=host, port=port)

@@ -10,12 +10,12 @@ The DB layer is read-only by design: the volume is mounted with `:ro` and the SQ
 ## Architecture
 
 ```
-                                   +--> /data/tracker.db (read-only URI)
-                                   |       (cached, nightly snapshot)
-Claude Code  --SSE-->  anthropic-tracker-mcp (port 3713)
-                                   |
-                                   +--> boards-api.greenhouse.io
-                                           (live, on-demand)
+                                              +--> /data/tracker.db (read-only URI)
+                                              |       (cached, nightly snapshot)
+Claude Code  --Streamable HTTP-->  anthropic-tracker-mcp (port 3713)
+                                              |
+                                              +--> boards-api.greenhouse.io
+                                                      (live, on-demand)
 ```
 
 The same named volume `anthropic-tracker-data` is mounted read-write by the [`anthropic-tracker`](https://github.com/pete-builds/anthropic-tracker) cron container and read-only here. The MCP server cannot mutate state, even if the code tried to.
@@ -48,7 +48,7 @@ All user input that flows into `LIKE` clauses (DB tools) is escaped via `_escape
 
 ## Stack
 
-- Python 3.13 + FastMCP 3.1.0 (SSE transport)
+- Python 3.13 + FastMCP 3.1.0 (Streamable HTTP transport, per [MCP spec 2025-03-26](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports))
 - SQLite (stdlib `sqlite3`, read-only URI mode)
 - httpx (async, for live Greenhouse calls)
 - beautifulsoup4 (HTML parsing for live compensation)
@@ -65,13 +65,12 @@ docker compose up -d --build
 docker logs anthropic-tracker-mcp     # confirm clean startup
 ```
 
-The MCP server is now serving SSE at `http://localhost:3713/sse`.
+The MCP server is now serving Streamable HTTP at `http://localhost:3713/mcp`.
 
 ## Register with Claude Code
 
 ```bash
-claude mcp add anthropic-tracker --transport sse --scope user \
-  --url http://<host>:3713/sse
+claude mcp add anthropic-tracker -t http -s user http://<host>:3713/mcp
 ```
 
 Replace `<host>` with `localhost` if you registered on the same machine, or whatever address points to the container otherwise (LAN, Tailscale, reverse proxy).
@@ -101,8 +100,8 @@ Environment variables (all optional):
 
 | Var | Default | Purpose |
 |---|---|---|
-| `MCP_HOST` | `0.0.0.0` | Bind address |
-| `MCP_PORT` | `3713` | Bind port |
+| `FASTMCP_HOST` | `0.0.0.0` | Bind address (legacy alias: `MCP_HOST`) |
+| `FASTMCP_PORT` | `3713` | Bind port (legacy alias: `MCP_PORT`) |
 | `TRACKER_DB_PATH` | `/data/tracker.db` | SQLite path inside the container |
 | `TZ` | `America/New_York` | Container timezone |
 
