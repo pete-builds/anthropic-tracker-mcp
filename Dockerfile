@@ -1,5 +1,9 @@
 FROM python:3.13-slim@sha256:a0779d7c12fc20be6ec6b4ddc901a4fd7657b8a6bc9def9d3fde89ed5efe0a3d
 
+# Apply Debian security patches on top of the pinned base. Keeps the digest
+# pin for reproducibility while picking up CVE fixes between base rebuilds.
+RUN apt-get update && apt-get -y upgrade && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 ENV PYTHONUNBUFFERED=1 \
