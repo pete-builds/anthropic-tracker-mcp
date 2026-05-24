@@ -1,4 +1,4 @@
-FROM python:3.13-slim@sha256:a0779d7c12fc20be6ec6b4ddc901a4fd7657b8a6bc9def9d3fde89ed5efe0a3d
+FROM python:3.14-slim@sha256:c845af9399020c7e562969a13689e929074a10fd057acd1b1fad06a2fb068e97
 
 # Apply Debian security patches on top of the pinned base. Keeps the digest
 # pin for reproducibility while picking up CVE fixes between base rebuilds.
