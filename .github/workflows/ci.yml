@@ -73,6 +73,25 @@ jobs:
           touch /tmp/tracker.db
           python -c "import server; import clients.tracker; import clients.greenhouse; import clients.parser"
 
+  test:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install runtime deps (hash-pinned) + test toolchain
+        run: |
+          pip install --require-hashes -r requirements.lock
+          pip install -r requirements-dev.txt
+
+      - name: Run tests
+        run: pytest -q
+
   scan:
     runs-on: ubuntu-latest
     needs: lint
