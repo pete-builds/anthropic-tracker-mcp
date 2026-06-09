@@ -6,8 +6,10 @@ x-logging: &default-logging
 
 services:
   anthropic-tracker-mcp:
-    build: .
-    image: anthropic-tracker-mcp:0.2.1
+    # Pull the published image by default. To build locally instead, comment
+    # out `image:` and uncomment `build: .`.
+    image: ghcr.io/pete-builds/anthropic-tracker-mcp:0.2.1
+    # build: .
     container_name: anthropic-tracker-mcp
     restart: unless-stopped
     ports:
