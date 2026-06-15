@@ -7,7 +7,10 @@ FROM python:3.14-slim@sha256:44dd04494ee8f3b538294360e7c4b3acb87c8268e4d0a4828a6
 # (e.g. CVE-2026-45447 fixed in libssl 3.5.6-1~deb13u2). Bump the date to
 # refresh. Build with: --build-arg CACHE_BUST=$(date +%Y-%m-%d)
 ARG CACHE_BUST=2026-06-15
-RUN apt-get update && apt-get -y upgrade && rm -rf /var/lib/apt/lists/*
+RUN echo "cache-bust: ${CACHE_BUST}" \
+    && apt-get update \
+    && apt-get -y upgrade \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
