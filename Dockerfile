@@ -1,7 +1,12 @@
-FROM python:3.14-slim@sha256:c845af9399020c7e562969a13689e929074a10fd057acd1b1fad06a2fb068e97
+FROM python:3.14-slim@sha256:44dd04494ee8f3b538294360e7c4b3acb87c8268e4d0a4828a6500b1eff50061
 
 # Apply Debian security patches on top of the pinned base. Keeps the digest
 # pin for reproducibility while picking up CVE fixes between base rebuilds.
+# CACHE_BUST forces this layer to re-run against current Debian mirrors so a
+# stale cached apt layer can't pin us to an unpatched libssl
+# (e.g. CVE-2026-45447 fixed in libssl 3.5.6-1~deb13u2). Bump the date to
+# refresh. Build with: --build-arg CACHE_BUST=$(date +%Y-%m-%d)
+ARG CACHE_BUST=2026-06-15
 RUN apt-get update && apt-get -y upgrade && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
