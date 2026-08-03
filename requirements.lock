@@ -526,9 +526,9 @@ python-dotenv==1.2.2 \
     #   -r requirements.txt
     #   fastmcp-slim
     #   pydantic-settings
-python-multipart==0.0.27 \
-    --hash=sha256:6fccfad17a27334bd0193681b369f476eda3409f17381a2d65aa7df3f7275645 \
-    --hash=sha256:9870a6a8c5a20a5bf4f07c017bd1489006ff8836cff097b6933355ee2b49b602
+python-multipart==0.0.32 \
+    --hash=sha256:be54b7f3fa167bb83e4fcd936b887b708f4e57fe75911c02aebf53efaf8d938e \
+    --hash=sha256:ff6d3f776f16878c894e52e107296ffc890e913c611b1a4ec6c44e2821fe2e23
     # via
     #   fastmcp-slim
     #   mcp
@@ -750,9 +750,9 @@ secretstorage==3.5.0 \
     --hash=sha256:0ce65888c0725fcb2c5bc0fdb8e5438eece02c523557ea40ce0703c266248137 \
     --hash=sha256:f04b8e4689cbce351744d5537bf6b1329c6fc68f91fa666f60a380edddcd11be
     # via keyring
-soupsieve==2.8.3 \
-    --hash=sha256:3267f1eeea4251fb42728b6dfb746edc9acaffc4a45b27e19450b676586e8349 \
-    --hash=sha256:ed64f2ba4eebeab06cc4962affce381647455978ffc1e36bb79a545b91f45a95
+soupsieve==2.9.1 \
+    --hash=sha256:4f4477399246b7a0c720a88ca2454b11cd6bb9ae4c9d170140786e916776c14c \
+    --hash=sha256:c33e6605bbc71dd628b00c632d58ae607c22bade247e52553928f83bbb75b4ba
     # via beautifulsoup4
 sse-starlette==3.4.1 \
     --hash=sha256:6b43cf21f1d574d582a6e1b0cfbde1c94dc86a32a701a7168c99c4475c6bd1d0 \
