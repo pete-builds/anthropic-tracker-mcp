@@ -11,7 +11,6 @@ from clients.parser import (
     parse_compensation,
 )
 
-
 STRUCTURED_HTML = """
 <div class="content-pay-transparency">
   <div class="pay-input">
@@ -113,7 +112,7 @@ def test_normalize_currency_european_format():
 
 
 def test_normalize_currency_garbage_returns_zero():
-    amount, currency = normalize_currency("not a salary")
+    amount, _currency = normalize_currency("not a salary")
     assert amount == 0
 
 
