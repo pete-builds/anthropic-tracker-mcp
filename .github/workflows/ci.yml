@@ -11,10 +11,10 @@ jobs:
     name: Lockfile drift check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: "3.13"
 
@@ -43,7 +43,7 @@ jobs:
                       print(f"::error file={src}::{m.group(1)}=={ver} pinned in {src} but missing from {lock}")
                       fail = True
                   elif hit.group(1) != ver:
-                      print(f"::error file={src}::{m.group(1)}: {src} pins =={ver} but {lock} has =={hit.group(1)}. Regenerate with: uv pip compile {src} -o {lock} --generate-hashes --python-version 3.13")
+                      print(f"::error file={src}::{m.group(1)}: {src} pins =={ver} but {lock} has =={hit.group(1)}. Regenerate with: uv pip compile {src} -o {lock} --generate-hashes --python-version 3.13 --python-platform linux")
                       fail = True
           sys.exit(1 if fail else 0)
           PYEOF
@@ -51,9 +51,9 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
           cache: pip
@@ -77,9 +77,9 @@ jobs:
     name: Unit tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
           cache: pip
@@ -96,7 +96,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: lint
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v4

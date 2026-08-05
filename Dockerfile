@@ -19,7 +19,11 @@ ENV PYTHONUNBUFFERED=1 \
 
 # Install from the hash-pinned lockfile. --require-hashes refuses any package
 # whose hash isn't in the file. Reproducible byte-for-byte.
-# Regenerate with: uv pip compile requirements.txt -o requirements.lock --generate-hashes
+# Regenerate with: uv pip compile requirements.txt -o requirements.lock \
+#   --generate-hashes --python-version 3.13 --python-platform linux
+# The platform flag matters: this lock is installed with --require-hashes in a
+# Linux image, and resolving on macOS produces different transitive versions
+# and wheel hashes.
 COPY requirements.lock .
 RUN pip install --no-cache-dir --require-hashes -r requirements.lock
 
