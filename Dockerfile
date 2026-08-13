@@ -1,4 +1,4 @@
-FROM python:3.14-slim@sha256:cea0e6040540fb2b965b6e7fb5ffa00871e632eef63719f0ea54bca189ce14a6
+FROM python:3.14-slim@sha256:ce40764625a4ff50df3548277632e7f96c4e77fe75fa848aae9885476e7df5a4
 
 # Apply Debian security patches on top of the pinned base. Keeps the digest
 # pin for reproducibility while picking up CVE fixes between base rebuilds.
@@ -25,7 +25,18 @@ ENV PYTHONUNBUFFERED=1 \
 # Linux image, and resolving on macOS produces different transitive versions
 # and wheel hashes.
 COPY requirements.lock .
-RUN pip install --no-cache-dir --require-hashes -r requirements.lock
+# pip is a build-time tool only: server.py and healthcheck.py never shell out to
+# it. Purging it after the install removes pip's vendored third-party copies
+# (pip/_vendor/msgpack, pip/_vendor/pkg_resources) which Trivy reports as
+# msgpack and setuptools findings against the image even though nothing in the
+# lockfile depends on them. Those copies are not separately upgradable, so
+# deleting pip is the fix rather than a version bump.
+RUN pip install --no-cache-dir --require-hashes -r requirements.lock \
+    && pip uninstall -y pip \
+    && rm -rf /usr/local/lib/python3.14/site-packages/pip \
+       /usr/local/lib/python3.14/site-packages/pip-*.dist-info \
+       /usr/local/lib/python3.14/ensurepip \
+    && rm -f /usr/local/bin/pip /usr/local/bin/pip3 /usr/local/bin/pip3.*
 
 COPY clients/ ./clients/
 COPY server.py .
