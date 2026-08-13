@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-08-13 — Drop pip from the runtime image
+
+The Trivy image scan failed on two HIGH findings that came from the base image, not from this project's dependencies.
+
+- **GHSA-6v7p-g79w-8964 (HIGH, msgpack 1.1.2):** out of bounds read and crash on `Unpacker` reuse. Fixed upstream in 1.2.1.
+- **CVE-2025-47273 (HIGH, setuptools 70.3.0):** path traversal in `PackageIndex`. Fixed upstream in 78.1.1.
+
+Neither package appears in `requirements.lock`. Both are vendored inside pip itself, at `pip/_vendor/msgpack` and `pip/_vendor/pkg_resources`, which is why the filesystem scan stayed green while the image scan failed. They arrived with pip 26.2.1 in the base image bump from `cea0e60` to `ce40764`.
+
+Vendored copies cannot be upgraded on their own, so the fix is to delete pip once the install is done. Nothing at runtime uses it: neither `server.py` nor `healthcheck.py` shells out to pip.
+
+- `Dockerfile`: base digest bumped to `ce40764`, and the install layer now runs `pip uninstall -y pip` followed by an explicit removal of `site-packages/pip*`, `ensurepip`, and the `/usr/local/bin/pip*` shims.
+- Verified on nix1 before push: `trivy image --severity HIGH,CRITICAL --ignore-unfixed` exits 0 against the rebuilt image, the container starts against the `anthropic-tracker-data` volume, and `healthcheck.py` exits 0.
+
+No tool, transport, or port changes. No client re-registration needed.
+
 ## 2026-05-11 — Security patch: fastmcp 3.2.4 (0.2.1)
 
 Bumped `fastmcp` 3.1.0 -> 3.2.4 to pick up upstream security fixes. No tool or transport changes; semver patch.
