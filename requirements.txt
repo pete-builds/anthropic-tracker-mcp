@@ -1,5 +1,5 @@
-fastmcp==3.4.6
-uvicorn==0.52.1
+fastmcp==3.4.7
+uvicorn==0.52.3
 python-dotenv==1.2.2
 httpx>=0.28.1,<1
 beautifulsoup4>=4.15.0,<5
