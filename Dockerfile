@@ -6,7 +6,7 @@ FROM python:3.14-slim@sha256:ce40764625a4ff50df3548277632e7f96c4e77fe75fa848aae9
 # stale cached apt layer can't pin us to an unpatched libssl
 # (e.g. CVE-2026-45447 fixed in libssl 3.5.6-1~deb13u2). Bump the date to
 # refresh. Build with: --build-arg CACHE_BUST=$(date +%Y-%m-%d)
-ARG CACHE_BUST=2026-06-15
+ARG CACHE_BUST=2026-08-19
 RUN echo "cache-bust: ${CACHE_BUST}" \
     && apt-get update \
     && apt-get -y upgrade \
