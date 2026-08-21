@@ -1,8 +1,8 @@
-# anthropic-tracker-mcp
+# greenhouse-hiring-tracker-mcp
 
-MCP server that exposes Anthropic's hiring data to Claude Code (and any other MCP client). Two data sources, ten tools.
+MCP server that exposes a Greenhouse public job board's hiring data to Claude Code (and any other MCP client). Two data sources, ten tools.
 
-- **7 cached tools** read from a read-only SQLite mount populated by [`anthropic-tracker`](https://github.com/pete-builds/anthropic-tracker)'s nightly cron. Fast, indexed, good for trend analysis.
+- **7 cached tools** read from a read-only SQLite mount populated by [`greenhouse-hiring-tracker`](https://github.com/pete-builds/greenhouse-hiring-tracker)'s nightly cron. Fast, indexed, good for trend analysis.
 - **3 live tools** hit Greenhouse's public board API directly so you can bypass the cache when freshness matters (within minutes of a posting going up).
 
 The DB layer is read-only by design: the volume is mounted with `:ro` and the SQLite driver opens it via `file:...?mode=ro`. The live layer is read-only by nature: Greenhouse's public API doesn't accept writes.
@@ -12,13 +12,13 @@ The DB layer is read-only by design: the volume is mounted with `:ro` and the SQ
 ```
                                               +--> /data/tracker.db (read-only URI)
                                               |       (cached, nightly snapshot)
-Claude Code  --Streamable HTTP-->  anthropic-tracker-mcp (port 3713)
+Claude Code  --Streamable HTTP-->  greenhouse-hiring-tracker-mcp (port 3713)
                                               |
                                               +--> boards-api.greenhouse.io
                                                       (live, on-demand)
 ```
 
-The same named volume `anthropic-tracker-data` is mounted read-write by the [`anthropic-tracker`](https://github.com/pete-builds/anthropic-tracker) cron container and read-only here. The MCP server cannot mutate state, even if the code tried to.
+The same named volume `anthropic-tracker-data` is mounted read-write by the [`greenhouse-hiring-tracker`](https://github.com/pete-builds/greenhouse-hiring-tracker) cron container and read-only here. The MCP server cannot mutate state, even if the code tried to.
 
 ## Tools (10)
 
@@ -56,11 +56,11 @@ All user input that flows into `LIKE` clauses (DB tools) is escaped via `_escape
 
 ## Quick start
 
-You need the `anthropic-tracker-data` Docker volume to already exist — that's created and populated by the [`anthropic-tracker`](https://github.com/pete-builds/anthropic-tracker) project. Stand that up first.
+You need the `anthropic-tracker-data` Docker volume to already exist — that's created and populated by the [`greenhouse-hiring-tracker`](https://github.com/pete-builds/greenhouse-hiring-tracker) project. Stand that up first.
 
 ```bash
-git clone https://github.com/pete-builds/anthropic-tracker-mcp.git
-cd anthropic-tracker-mcp
+git clone https://github.com/pete-builds/greenhouse-hiring-tracker-mcp.git
+cd greenhouse-hiring-tracker-mcp
 docker compose up -d --build
 docker logs anthropic-tracker-mcp     # confirm clean startup
 ```
@@ -78,7 +78,7 @@ Replace `<host>` with `localhost` if you registered on the same machine, or what
 ## File structure
 
 ```
-anthropic-tracker-mcp/
+greenhouse-hiring-tracker-mcp/
   server.py              # FastMCP app — 10 @mcp.tool() definitions
   healthcheck.py         # Docker HEALTHCHECK
   clients/
@@ -122,7 +122,7 @@ The upstream `anthropic-tracker` writes the DB in WAL mode, which uses sidecar f
 
 ## Related
 
-- [`anthropic-tracker`](https://github.com/pete-builds/anthropic-tracker) — the data pipeline (CLI, web dashboard, daily cron) that produces the SQLite DB this MCP serves
+- [`greenhouse-hiring-tracker`](https://github.com/pete-builds/greenhouse-hiring-tracker) — the data pipeline (CLI, web dashboard, daily cron) that produces the SQLite DB this MCP serves
 
 ## License
 
