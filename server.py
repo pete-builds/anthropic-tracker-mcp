@@ -56,6 +56,38 @@ mcp = FastMCP("Anthropic Tracker")
 
 log = logging.getLogger("anthropic-tracker.tools")
 
+# --- Tool annotations ---
+# Ten tools, all reads, and not one writes anything anywhere. The DB is mounted
+# read-only at the volume layer AND opened read-only at the SQLite driver
+# layer, so "read-only" here is enforced twice over rather than merely
+# intended. Declaring it in the manifest is what lets a client tell this apart
+# from a server that could write, since nothing else in the manifest can.
+#
+# The open-world split is exactly the two data sources this server was built
+# around. Seven tools read the cached SQLite snapshot that the nightly
+# anthropic-tracker cron populates: they never open a socket, and a repeated
+# call returns the same answer until the next nightly run. Three live tools hit
+# Greenhouse's public board API directly, which is the whole reason they exist
+# -- to bypass the cache when freshness matters. Marking all ten open-world
+# would erase the one distinction the tool docstrings work hardest to explain.
+
+#: Reads the cached snapshot. Never opens a socket.
+READ_CACHED = {
+    "readOnlyHint": True,
+    "destructiveHint": False,
+    "idempotentHint": True,
+    "openWorldHint": False,
+}
+
+#: Reads Greenhouse's public board API. An answer can change between two
+#: identical calls because a job was posted or pulled.
+READ_LIVE = {
+    "readOnlyHint": True,
+    "destructiveHint": False,
+    "idempotentHint": True,
+    "openWorldHint": True,
+}
+
 
 def _format(data: object) -> str:
     """Format response data as readable JSON string."""
@@ -126,7 +158,7 @@ def tool_guard(func: Callable[..., Awaitable[str]]) -> Callable[..., Awaitable[s
 # ============================================================
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_CACHED)
 @tool_guard
 async def search_jobs(
     query: str,
@@ -150,7 +182,7 @@ async def search_jobs(
     return _format({"count": len(results), "jobs": results})
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_CACHED)
 @tool_guard
 async def recent_changes(days: int = 7) -> str:
     """List jobs added and removed in the last N days.
@@ -165,7 +197,7 @@ async def recent_changes(days: int = 7) -> str:
     return _format(db.recent_changes(days=days))
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_CACHED)
 @tool_guard
 async def compensation_for(role_pattern: str) -> str:
     """Look up posted compensation for jobs matching a title pattern.
@@ -182,7 +214,7 @@ async def compensation_for(role_pattern: str) -> str:
     return _format({"pattern": role_pattern, "count": len(matches), "matches": matches})
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_CACHED)
 @tool_guard
 async def department_trends(name: str | None = None, days: int = 30) -> str:
     """Per-department active job counts over the last N days.
@@ -198,7 +230,7 @@ async def department_trends(name: str | None = None, days: int = 30) -> str:
     return _format(db.department_trends(name=name, days=days))
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_CACHED)
 @tool_guard
 async def active_alerts(severity: str | None = None) -> str:
     """List unacknowledged tracker alerts.
@@ -213,7 +245,7 @@ async def active_alerts(severity: str | None = None) -> str:
     return _format({"count": len(alerts), "alerts": alerts})
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_CACHED)
 @tool_guard
 async def daily_summary(date: str | None = None) -> str:
     """Snapshot of total/added/removed jobs and per-department/location counts.
@@ -231,7 +263,7 @@ async def daily_summary(date: str | None = None) -> str:
     return _format(summary)
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_CACHED)
 @tool_guard
 async def db_stats() -> str:
     """Database health snapshot: row counts per table, latest snapshot, totals.
@@ -296,7 +328,7 @@ def _shape_live_job(job: dict) -> dict:
     }
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_LIVE)
 @tool_guard
 async def live_jobs(
     query: str | None = None,
@@ -337,7 +369,7 @@ async def live_jobs(
     return _format({"count": len(shaped), "jobs": shaped})
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_LIVE)
 @tool_guard
 async def live_job_detail(job_id: int) -> str:
     """Fetch a single Anthropic job with full HTML content from Greenhouse.
@@ -373,7 +405,7 @@ async def live_job_detail(job_id: int) -> str:
     })
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_LIVE)
 @tool_guard
 async def live_compensation(job_id: int) -> str:
     """Parse compensation directly from a live Greenhouse job description.

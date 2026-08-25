@@ -116,3 +116,47 @@ async def test_every_tool_is_guarded(server):
         if not hasattr(getattr(tool, "fn", None), "__wrapped__")
     ]
     assert unguarded == []
+
+
+# --- annotations: what a client learns before calling ---------------------
+#
+# Nothing else in the manifest distinguishes a cached read from a live API
+# call, and the tool docstrings work hard to explain exactly that difference.
+# The annotations put it where a client can act on it.
+
+CACHED = {
+    "search_jobs", "recent_changes", "compensation_for", "department_trends",
+    "active_alerts", "daily_summary", "db_stats",
+}
+LIVE = {"live_jobs", "live_job_detail", "live_compensation"}
+
+
+async def test_every_tool_is_annotated(server):
+    tools = {t.name: t for t in await server.mcp.list_tools()}
+    assert set(tools) == CACHED | LIVE
+    assert sorted(n for n, t in tools.items() if t.annotations is None) == []
+
+
+async def test_nothing_writes(server):
+    """The DB is read-only at the volume layer AND the SQLite driver layer.
+
+    So this is enforced twice over rather than merely intended, and the
+    manifest should say so.
+    """
+    tools = {t.name: t for t in await server.mcp.list_tools()}
+    assert sorted(n for n, t in tools.items() if not t.annotations.readOnlyHint) == []
+    assert sorted(n for n, t in tools.items() if t.annotations.destructiveHint) == []
+
+
+async def test_cached_tools_do_not_claim_an_open_world(server):
+    """They read the snapshot the nightly cron populates. No socket is opened."""
+    tools = {t.name: t for t in await server.mcp.list_tools()}
+    wrong = sorted(n for n in CACHED if tools[n].annotations.openWorldHint is not False)
+    assert wrong == []
+
+
+async def test_live_tools_do(server):
+    """Bypassing the cache is the entire reason these three exist."""
+    tools = {t.name: t for t in await server.mcp.list_tools()}
+    wrong = sorted(n for n in LIVE if tools[n].annotations.openWorldHint is not True)
+    assert wrong == []
