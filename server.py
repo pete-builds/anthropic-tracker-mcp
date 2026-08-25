@@ -139,7 +139,7 @@ def tool_guard(func: Callable[..., Awaitable[str]]) -> Callable[..., Awaitable[s
     async def wrapper(*args: Any, **kwargs: Any) -> str:
         try:
             return await func(*args, **kwargs)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - catching everything IS the backstop
             log.error(
                 "tool %s raised %s: %s", func.__name__, type(exc).__name__, exc
             )
