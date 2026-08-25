@@ -12,9 +12,13 @@ and opened read-only at the SQLite driver layer (`file:...?mode=ro`) for defense
 in depth. The live tools never touch the DB.
 """
 
+import functools
 import json
+import logging
 import os
 import sys
+from collections.abc import Awaitable, Callable
+from typing import Any
 
 import httpx
 from dotenv import load_dotenv
@@ -50,6 +54,8 @@ greenhouse = GreenhouseClient()
 # --- MCP Server ---
 mcp = FastMCP("Anthropic Tracker")
 
+log = logging.getLogger("anthropic-tracker.tools")
+
 
 def _format(data: object) -> str:
     """Format response data as readable JSON string."""
@@ -57,14 +63,62 @@ def _format(data: object) -> str:
 
 
 def _greenhouse_error(exc: Exception) -> dict:
-    """Shape an httpx exception into a structured tool response.
-
-    Tools must NEVER raise. Raising would crash the MCP session for Claude.
-    """
+    """Shape an httpx exception into a structured tool response."""
     return {
         "error": "Greenhouse API unavailable",
         "detail": f"{type(exc).__name__}: {exc}",
     }
+
+
+def tool_guard(func: Callable[..., Awaitable[str]]) -> Callable[..., Awaitable[str]]:
+    """Backstop: turn any escaping exception into the declared error contract.
+
+    Every tool here documents what it returns on failure, and the live tools
+    handle the failures they expect. This catches what neither anticipated, so
+    the documented contract is what a caller actually gets rather than what the
+    tool meant to give them.
+
+    Two concrete escapes motivated it:
+
+    * a **non-JSON 200** from Greenhouse. Every live tool calls .json() on the
+      response, which raises a JSONDecodeError -- not an httpx error, so not in
+      any of the caught tuples. A captive-portal login page, an HTML error page
+      from a CDN, or a truncated body all produce exactly this.
+    * a **sqlite3.Error** from any of the seven cached-DB tools, none of which
+      catch anything at all. The DB is a read-only mount populated by a cron
+      container on another host; a partial write, a schema change, or a missing
+      file surfaces here and nowhere else.
+
+    Order matters below: the specific handlers inside each tool still run first
+    and still produce their own richer messages ("Job not found" and its
+    job_id). This only sees what got past them.
+
+    On the "would crash the MCP session" claim this replaces: it is false, and
+    worth correcting rather than deleting. FastMCP catches a raising tool and
+    returns an isError result; the session survives. What actually happens is
+    that the caller gets a framework-shaped error instead of the documented
+    envelope -- so an agent parsing for "error" finds nothing it recognises and
+    treats a hard failure as an unreadable response. Less dramatic than a crash,
+    and more likely to be acted on wrongly, because it looks like the tool
+    answered.
+    """
+
+    @functools.wraps(func)
+    async def wrapper(*args: Any, **kwargs: Any) -> str:
+        try:
+            return await func(*args, **kwargs)
+        except Exception as exc:
+            log.error(
+                "tool %s raised %s: %s", func.__name__, type(exc).__name__, exc
+            )
+            return _format(
+                {
+                    "error": f"Unexpected failure in {func.__name__}",
+                    "detail": f"{type(exc).__name__}: {exc}",
+                }
+            )
+
+    return wrapper
 
 
 # ============================================================
@@ -73,6 +127,7 @@ def _greenhouse_error(exc: Exception) -> dict:
 
 
 @mcp.tool()
+@tool_guard
 async def search_jobs(
     query: str,
     department: str | None = None,
@@ -96,6 +151,7 @@ async def search_jobs(
 
 
 @mcp.tool()
+@tool_guard
 async def recent_changes(days: int = 7) -> str:
     """List jobs added and removed in the last N days.
 
@@ -110,6 +166,7 @@ async def recent_changes(days: int = 7) -> str:
 
 
 @mcp.tool()
+@tool_guard
 async def compensation_for(role_pattern: str) -> str:
     """Look up posted compensation for jobs matching a title pattern.
 
@@ -126,6 +183,7 @@ async def compensation_for(role_pattern: str) -> str:
 
 
 @mcp.tool()
+@tool_guard
 async def department_trends(name: str | None = None, days: int = 30) -> str:
     """Per-department active job counts over the last N days.
 
@@ -141,6 +199,7 @@ async def department_trends(name: str | None = None, days: int = 30) -> str:
 
 
 @mcp.tool()
+@tool_guard
 async def active_alerts(severity: str | None = None) -> str:
     """List unacknowledged tracker alerts.
 
@@ -155,6 +214,7 @@ async def active_alerts(severity: str | None = None) -> str:
 
 
 @mcp.tool()
+@tool_guard
 async def daily_summary(date: str | None = None) -> str:
     """Snapshot of total/added/removed jobs and per-department/location counts.
 
@@ -172,6 +232,7 @@ async def daily_summary(date: str | None = None) -> str:
 
 
 @mcp.tool()
+@tool_guard
 async def db_stats() -> str:
     """Database health snapshot: row counts per table, latest snapshot, totals.
 
@@ -236,6 +297,7 @@ def _shape_live_job(job: dict) -> dict:
 
 
 @mcp.tool()
+@tool_guard
 async def live_jobs(
     query: str | None = None,
     department: str | None = None,
@@ -276,6 +338,7 @@ async def live_jobs(
 
 
 @mcp.tool()
+@tool_guard
 async def live_job_detail(job_id: int) -> str:
     """Fetch a single Anthropic job with full HTML content from Greenhouse.
 
@@ -311,6 +374,7 @@ async def live_job_detail(job_id: int) -> str:
 
 
 @mcp.tool()
+@tool_guard
 async def live_compensation(job_id: int) -> str:
     """Parse compensation directly from a live Greenhouse job description.
 
