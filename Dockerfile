@@ -2,15 +2,23 @@ FROM python:3.14-slim@sha256:ce40764625a4ff50df3548277632e7f96c4e77fe75fa848aae9
 
 # Apply Debian security patches on top of the pinned base. Keeps the digest
 # pin for reproducibility while picking up CVE fixes between base rebuilds.
-# CACHE_BUST forces this layer to re-run against current Debian mirrors so a
-# stale cached apt layer can't pin us to an unpatched libssl
-# (e.g. CVE-2026-45447 fixed in libssl 3.5.6-1~deb13u2). Bump the date to
-# refresh. Build with: --build-arg CACHE_BUST=$(date +%Y-%m-%d)
-ARG CACHE_BUST=2026-08-19
-RUN echo "cache-bust: ${CACHE_BUST}" \
-    && apt-get update \
+#
+# This used to be `ARG CACHE_BUST=<date>` with a note to bump the date by hand.
+# The diagnosis in that note was exactly right and the mechanism never worked:
+# no workflow ever passed --build-arg CACHE_BUST, so the arg sat at its default
+# and the layer cached forever anyway. It had not been bumped since 2026-08-19,
+# and on 2026-08-26 the Trivy gate was failing every PR in this repo on
+# libssl3t64 CVE-2026-14456 while trixie-security had carried the fixed
+# 3.5.7-1~deb13u2 for some time. A cache-bust that depends on a human
+# remembering is a cache-bust that is stale exactly when it matters.
+#
+# trixie-security's Release file changes when and only when a security update
+# is published, so keying the layer to it rebuilds precisely when there is
+# something to install, with no date to maintain.
+ADD https://deb.debian.org/debian-security/dists/trixie-security/Release /tmp/debian-security-release
+RUN apt-get update \
     && apt-get -y upgrade \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /tmp/debian-security-release /var/lib/apt/lists/*
 
 WORKDIR /app
 
