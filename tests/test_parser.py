@@ -119,3 +119,91 @@ def test_normalize_currency_garbage_returns_zero():
 def test_detect_comp_type():
     assert detect_comp_type("total target compensation") == "ote"
     assert detect_comp_type("base annual salary") == "annual"
+
+
+# --- plausibility: a benefit is not a salary ------------------------------
+#
+# The regex fallback searches the WHOLE description and used to take the first
+# dollar range it found. Job posts are full of dollar ranges that are not
+# salaries, and benefits sections routinely appear ABOVE the pay range.
+
+
+def test_a_wellness_stipend_above_the_salary_is_not_returned_as_the_salary():
+    """The exact shape that motivated this: benefit first, salary second."""
+    html = """
+    <div>
+      <h3>Benefits</h3>
+      <p>We offer a $500 - $2,000 annual wellness stipend.</p>
+      <h3>Compensation</h3>
+      <p>The base salary range for this role is $180,000 - $260,000 USD.</p>
+    </div>
+    """
+    result = parse_compensation(html)
+    assert result is not None
+    assert result["salary_min"] == 18_000_000
+    assert result["salary_max"] == 26_000_000
+
+
+def test_a_signing_bonus_is_skipped_even_though_its_numbers_are_plausible():
+    """The floor cannot catch this one. Only the surrounding words can."""
+    html = """
+    <div>
+      <p>Signing bonus of $10,000 - $50,000 depending on experience.</p>
+      <p>Base pay range: $200,000 - $300,000 USD.</p>
+    </div>
+    """
+    result = parse_compensation(html)
+    assert result["salary_min"] == 20_000_000
+
+
+def test_an_unfamiliar_benefit_is_still_caught_by_the_floor():
+    """New benefit vocabulary appears constantly; the word list is always behind.
+
+    The floor is the backstop for exactly that, which is why both checks exist.
+    """
+    html = """
+    <div>
+      <p>Annual gizmo entitlement of $300 - $900.</p>
+      <p>Salary: $150,000 - $190,000 USD.</p>
+    </div>
+    """
+    result = parse_compensation(html)
+    assert result["salary_min"] == 15_000_000
+
+
+def test_an_hourly_rate_is_recognised_not_rejected_by_the_floor():
+    """A legitimate small number. Rejecting it would trade one bug for another."""
+    html = "<div><p>This role pays $28 - $42 per hour.</p></div>"
+    result = parse_compensation(html)
+    assert result is not None
+    assert result["comp_type"] == "hourly"
+    assert result["salary_min"] == 2_800
+    assert result["salary_max"] == 4_200
+
+
+def test_a_post_with_only_a_stipend_returns_nothing_rather_than_the_stipend():
+    """Returning None is what a post with no pay data already returns.
+
+    A missing salary is visibly missing. A stipend labelled as a salary is not,
+    which is why guessing would be worse than declining.
+    """
+    html = "<div><p>Includes a $500 - $1,500 home office stipend.</p></div>"
+    assert parse_compensation(html) is None
+
+
+def test_a_plain_salary_with_no_benefits_section_is_unaffected():
+    """The common case must not regress."""
+    html = "<div><p>Compensation: $290,000 - $435,000 USD</p></div>"
+    result = parse_compensation(html)
+    assert result["salary_min"] == 29_000_000
+    assert result["salary_max"] == 43_500_000
+    assert result["comp_type"] == "annual"
+
+
+def test_ote_wording_near_the_range_still_wins():
+    """Comp type is read from the window around the match, not the document.
+
+    A post mentioning OTE about a different role should not relabel this one.
+    """
+    html = "<div><p>On-target earnings of $250,000 - $320,000 USD.</p></div>"
+    assert parse_compensation(html)["comp_type"] == "ote"

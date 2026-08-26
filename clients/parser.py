@@ -36,6 +36,68 @@ SALARY_RANGE_PATTERN = re.compile(
     r"([£$€])\s*([\d,.]+)\s*[—–\-]\s*[£$€]?\s*([\d,.]+)\s*(USD|GBP|EUR|CAD|AUD|CHF|JPY|KRW|INR|SGD)?"
 )
 
+# --- Plausibility, for the regex fallback only --------------------------
+#
+# The fallback searches the WHOLE job description and used to take the first
+# dollar range it found. Job posts are full of dollar ranges that are not
+# salaries -- a wellness stipend, a referral bonus, an equipment allowance, a
+# 401(k) match -- and benefits sections routinely appear ABOVE the pay range.
+# So "$500 - $2,000 annual wellness stipend" was returned as the annual salary,
+# with no signal that anything was wrong.
+#
+# Two independent checks, because neither alone is enough.
+#
+# CONTEXT catches the ones whose numbers look like a salary. A $10,000-$50,000
+# signing bonus passes any floor you would dare set, and only the surrounding
+# words give it away.
+#
+# A FLOOR catches the ones whose context is unfamiliar. New benefit vocabulary
+# appears constantly and the word list will always be behind it, but a
+# four-figure annual salary is implausible in every currency this parser
+# accepts -- for JPY, KRW, or INR a real salary is orders of magnitude larger,
+# so a single conservative floor does not need a per-currency table.
+#
+# What this deliberately does NOT do is guess. When no candidate survives, the
+# parser returns None, which is what it already returns for a post with no pay
+# data at all. A missing salary is visibly missing; a stipend labelled as a
+# salary is not.
+
+#: Words near a range that mean it is not the base pay for the job.
+_NON_SALARY_CONTEXT = re.compile(
+    r"\b(stipend|bonus|allowance|reimburse\w*|credit|discount|match(?:ing|es)?"
+    r"|referral|relocation|equity|grant|award|budget|per diem|perk\w*"
+    r"|subsid\w+|contribution|deductible|premium|copay|fee|tuition)\b",
+    re.IGNORECASE,
+)
+
+#: Characters of surrounding text inspected for that vocabulary.
+#:
+#: This number is a real tradeoff and both directions cost something, so it was
+#: set by measuring rather than guessed. Too WIDE and a benefits paragraph
+#: poisons the salary that follows it: at 120 the wellness-stipend fixture
+#: rejected the genuine $180k-$260k range 61 characters later, turning a
+#: precision fix into a recall bug. Too NARROW and the noun a range belongs to
+#: falls outside it, so "$500 - $2,000 annual wellness stipend" reads as pay.
+#:
+#: 48 clears both: the disqualifying noun sits within ~17 characters of its
+#: range in the cases observed, while the nearest unrelated sentence is ~58
+#: away. Tests pin both sides, so a later widening that reintroduces the recall
+#: bug fails rather than passing quietly.
+_CONTEXT_WINDOW = 48
+
+#: Below this, in whole currency units, it is not an annual salary. Set low on
+#: purpose: the job here is to reject four-figure stipends, not to encode a
+#: view about what a role should pay.
+_MIN_PLAUSIBLE_ANNUAL = 10_000
+
+#: An hourly rate is a legitimate small number, so it must be recognised rather
+#: than rejected by the floor above.
+_HOURLY_RE = re.compile(r"\b(per hour|hourly|/\s*hr|/\s*hour|an hour)\b", re.IGNORECASE)
+
+#: Bounds for one, in whole currency units.
+_MIN_PLAUSIBLE_HOURLY = 5
+_MAX_PLAUSIBLE_HOURLY = 2_000
+
 # Keywords that indicate OTE (on-target earnings) vs base salary
 OTE_KEYWORDS = [
     "on-target earnings",
@@ -149,28 +211,58 @@ def _parse_structured_pay(pay_div) -> dict | None:
     return _parse_salary_regex(raw_text)
 
 
+def _is_plausible(salary_min_cents: int, comp_type: str) -> bool:
+    """Could this range be the pay for a job, as opposed to a benefit?
+
+    Only the low end is tested. A stipend's ceiling can be arbitrarily high and
+    tells you nothing; its floor is what gives it away.
+    """
+    units = salary_min_cents / 100
+    if comp_type == "hourly":
+        return _MIN_PLAUSIBLE_HOURLY <= units <= _MAX_PLAUSIBLE_HOURLY
+    return units >= _MIN_PLAUSIBLE_ANNUAL
+
+
 def _parse_salary_regex(text: str) -> dict | None:
-    """Extract salary range using regex patterns."""
-    match = SALARY_RANGE_PATTERN.search(text)
-    if not match:
-        return None
+    """Extract a salary range, skipping ranges that are plainly not salaries.
 
-    symbol = match.group(1)
-    min_str = match.group(2)
-    max_str = match.group(3)
-    explicit_currency = match.group(4)
+    Walks every match rather than taking the first, because in a job post the
+    first dollar range is very often a benefit. See the plausibility note above
+    _NON_SALARY_CONTEXT for why both a context check and a floor are needed.
+    """
+    for match in SALARY_RANGE_PATTERN.finditer(text):
+        symbol = match.group(1)
+        min_str = match.group(2)
+        max_str = match.group(3)
+        explicit_currency = match.group(4)
 
-    currency = explicit_currency or CURRENCY_SYMBOLS.get(symbol, "USD")
-    salary_min, _ = normalize_currency(f"{symbol}{min_str}")
-    salary_max, _ = normalize_currency(f"{symbol}{max_str}")
+        currency = explicit_currency or CURRENCY_SYMBOLS.get(symbol, "USD")
+        salary_min, _ = normalize_currency(f"{symbol}{min_str}")
+        salary_max, _ = normalize_currency(f"{symbol}{max_str}")
 
-    if not salary_min or not salary_max:
-        return None
+        if not salary_min or not salary_max:
+            continue
 
-    return {
-        "salary_min": salary_min,
-        "salary_max": salary_max,
-        "currency": currency,
-        "comp_type": detect_comp_type(text),
-        "raw_text": text[:500],
-    }
+        window = text[
+            max(0, match.start() - _CONTEXT_WINDOW) : match.end() + _CONTEXT_WINDOW
+        ]
+        if _NON_SALARY_CONTEXT.search(window):
+            continue
+
+        # Comp type is read from the window, not the whole document: a post
+        # that says "hourly" once about a different role should not relabel
+        # this range, and OTE wording is likewise local to the range it
+        # describes.
+        comp_type = "hourly" if _HOURLY_RE.search(window) else detect_comp_type(window)
+        if not _is_plausible(salary_min, comp_type):
+            continue
+
+        return {
+            "salary_min": salary_min,
+            "salary_max": salary_max,
+            "currency": currency,
+            "comp_type": comp_type,
+            "raw_text": text[:500],
+        }
+
+    return None
