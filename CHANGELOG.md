@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-08-25 — Hold the error contract for failures nobody anticipated
+
+Every tool here documents what it returns on failure, and the three live tools handle the failures they expect. Two kinds got past all of it, from the overnight code review.
+
+- **A non-JSON 200 from Greenhouse.** Every live tool calls `.json()` on the response, which raises `JSONDecodeError`. That is not an httpx exception, so it was in none of the caught tuples: `(HTTPStatusError, TransportError, TimeoutException)`. A captive-portal login page, an HTML error page from a CDN, or a truncated body all produce exactly this.
+- **A `sqlite3.Error` from any cached-DB tool.** None of the seven caught anything at all. The DB is a read-only mount populated by a cron container on another host, so a partial write, a schema change, or a missing file surfaces here and nowhere else.
+
+`tool_guard` is a backstop below the existing handlers, ported from the decorator already proven in `mcp-fleaflicker`. The specific handlers still run first and keep their richer messages: a 404 stays `{"error": "Job not found", "job_id": ...}` rather than being flattened, and a test pins that, since flattening it would make the guard a downgrade instead of a backstop.
+
+Also corrected a comment that claimed an uncaught exception "would crash the MCP session for Claude". It does not. FastMCP catches a raising tool and returns an `isError` result, and the session survives. What actually happens is that the caller gets a framework-shaped error instead of the documented envelope, so an agent parsing for `error` finds nothing it recognises and treats a hard failure as an unreadable response. Less dramatic, and more likely to be acted on wrongly, because it looks like the tool answered.
+
+- `server.py`: `tool_guard` added and applied to all 10 tools.
+- `tests/test_tool_guard.py`: new. First tests to exercise `server.py` at all. Covers both escapes, the success path, and that the 404 handler is not shadowed. One test walks the live tool registry and fails if any tool is unguarded, which is how this regresses when tool 11 is added; verified by removing one decorator and watching it fail.
+
+No tool, transport, or port changes. No client re-registration needed.
+
 ## 2026-08-13 — Drop pip from the runtime image
 
 The Trivy image scan failed on two HIGH findings that came from the base image, not from this project's dependencies.
